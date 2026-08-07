@@ -18,7 +18,11 @@ jobs:
 
       - name: Run shfmt inside Docker (mvdan/shfmt)
         run: |
-          docker run --rm -v "${{ github.workspace }}:/src" -w /src mvdan/shfmt:latest sh -c 'find . -name "*.sh" -type f -print0 | xargs -0 shfmt -i 0 -ci -bn -w'
+          files=$(find . -name "*.sh" -type f -print0 | xargs -0 echo)
+          if [ -n "$files" ]; then
+            find . -name "*.sh" -type f -print0 | xargs -0 docker run --rm -v "${{ github.workspace }}:/src" -w /src mvdan/shfmt:latest -i 0 -ci -bn -w
+          else
+            echo "No shell scripts found, skipping shfmt"
 
       - name: Run ShellCheck inside Docker (koalaman/shellcheck-alpine)
         run: |
