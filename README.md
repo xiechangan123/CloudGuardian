@@ -11,14 +11,7 @@ apk add jq
 
 仅需 `jq`。`date`、`mktemp`、`mkdir`、`crond` 等全部使用 Alpine 自带 BusyBox。
 
-### 2. 启用系统自带的 crond（BusyBox）
-
-```sh
-rc-update add crond default
-rc-service crond start
-```
-
-### 3. 克隆并配置
+### 2. 克隆并配置
 
 ```sh
 cd ~
@@ -47,18 +40,18 @@ vi .env
 - `NIC`：网卡名称（谷歌云默认是 `eth0`）
 - `TX_BYTES_LIMIT`：每日流量上限（单位：字节，默认约 6G；不能写 `100M` 这种带单位的，需写成纯数字，例如 100MB = `104857600`）
 
-### 4. 以 root 运行脚本（直接运行用于调试/一次性执行） 
+### 3. 以 root 运行脚本（直接运行用于调试/一次性执行） 
 
 ```sh
 chmod +x run.sh && ./run.sh
 ```
 
-### 5. 添加定时任务（每分钟执行一次）
+### 4. 添加定时任务（每分钟执行一次）
 
 Alpine BusyBox crond 使用 `/etc/crontabs/root`：
 
 ```sh
-echo "* * * * * cd /root/CloudGuardian && ./run.sh" >> /etc/crontabs/root
+echo "* * * * * cd CloudGuardian && ./run.sh" >> /etc/crontabs/root
 ```
 
 或：
@@ -71,6 +64,12 @@ crontab -e
 
 ```
 * * * * * cd /你的路径/CloudGuardian && ./run.sh
+```
+
+### 5. 重启系统自带的 crond（BusyBox）
+
+```sh
+rc-service crond restart
 ```
 
 ### 6. 确保服务已安装
