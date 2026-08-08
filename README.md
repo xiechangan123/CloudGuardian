@@ -5,7 +5,7 @@
 ### 1. 安装依赖
 
 ```sh
-apk update
+apk -U upgrade
 apk add jq
 ```
 
@@ -47,7 +47,10 @@ vi .env
 - `NIC`：网卡名称（谷歌云默认是 `eth0`）
 - `TX_BYTES_LIMIT`：每日流量上限（单位：字节，默认约 6G；不能写 `100M` 这种带单位的，需写成纯数字，例如 100MB = `104857600`）
 
-### 4. 添加定时任务（每分钟执行一次）
+### 4. 以 root 运行脚本（直接运行用于调试/一次性执行） 
+chmod +x run.sh && ./run.sh
+
+### 5. 添加定时任务（每分钟执行一次）
 
 Alpine BusyBox crond 使用 `/etc/crontabs/root`：
 
@@ -67,7 +70,7 @@ crontab -e
 * * * * * cd /你的路径/CloudGuardian && ./run.sh
 ```
 
-### 5. 确保服务已安装
+### 6. 确保服务已安装
 
 脚本通过 OpenRC 管理以下服务（对应 `/etc/init.d/`）：
 
@@ -78,7 +81,7 @@ crontab -e
 
 请提前安装好对应服务。
 
-### 6. 查看流量使用情况
+### 7. 查看流量使用情况
 
 #### 方式一：查看脚本统计（data.json）
 
