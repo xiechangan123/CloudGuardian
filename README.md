@@ -5,8 +5,8 @@
 ### 1. 安装依赖
 
 ```sh
-sudo apk update
-sudo apk add jq
+apk update
+apk add jq
 ```
 
 仅需 `jq`。`date`、`mktemp`、`mkdir`、`crond` 等全部使用 Alpine 自带 BusyBox。
@@ -14,8 +14,8 @@ sudo apk add jq
 ### 2. 启用系统自带的 crond（BusyBox）
 
 ```sh
-sudo rc-update add crond default
-sudo rc-service crond start
+rc-update add crond default
+rc-service crond start
 ```
 
 ### 3. 克隆并配置
@@ -83,11 +83,11 @@ crontab -e
 #### 方式一：查看脚本统计（data.json）
 
 ```sh
-cat data.json
+cd CloudGuardian && cat data.json
 ```
 
 字段说明：
-
+- `last_update`：上次更新的时间戳
 - `current`：网卡累计已发送字节
 - `addup`：今日累计出站流量（字节），超过 `TX_BYTES_LIMIT` 会停止服务
 
