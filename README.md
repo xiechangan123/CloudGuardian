@@ -6,7 +6,7 @@
 
 **核心优势：**
 
-- **精准流量控制：** 实时监控虚拟机流量使用情况，精确控制出站流量，确保始��在 200G 免费额度内，避免产生任何额外费用。
+- **精准流量控制：** 实时监控虚拟机流量使用情况，精确控制出站流量，确保始终在 200G 免费额度内，避免产生任何额外费用。
 - **简单易用：** 无需复杂配置，只需简单几步即可完成设置，即使是新手用户也能轻松上手。
 - **安全可靠：** 不安装额外软件，确保数据安全和隐私，让您使用无忧。
 
@@ -23,13 +23,13 @@
 
 **立即行动，开启您的永久免费 Google Cloud VPS 之旅！**
 
-**Cloud-Guardian- 让云计算更简单，更经济！**
+**Cloud-Guardian - 让云计算更简单，更经济！**
 
 ---
 
 #### 效果展示：
 
-以每天 0.25G 流量上限为例（这个数值可修改，**GCP 实际每天可使用 6G 上传流量，只要每月不超过 200G 即可**）展示一下效果：
+以每天 0.25G 流量上限为例（这个数值可修改，**GCP 实际每天可使用约 6G 上传流量，只要每月不超过 200G 即可**）展示一下效果：
 
 ##### 达到额度之前：
 
@@ -51,39 +51,86 @@
 
 ##### 谷歌云永久免费服务器限制要求：
 
-- 地区限制：在美国的以下区域俄勒冈、爱荷华、南卡罗来纳；
-
+- 地区限制：在美国的以下区域俄勒冈、爱荷华、南卡罗来纳
 - 磁盘限制：30 GB 标准永久性磁盘
-
 - 网络服务层级：标准（每个区域每月可免费传输 200GB 数据）
 
 ---
 
-#### 使用方法：
+## 在 Alpine Linux 上安装与运行（本仓库专用）
 
+本仓库已针对 **Alpine Linux + OpenRC** 全面优化，使用 POSIX `sh` 编写。
+
+### 1. 安装依赖
+
+```sh
+sudo apk update
+sudo apk add jq util-linux coreutils
 ```
-sudo apt remove -y --purge man-db
-sudo apt install -y git
 
+- `jq`：必须
+- `util-linux`：提供 `mktemp` 等工具
+- `coreutils`：提供更好的 `date` 支持（推荐）
+
+### 2. 启用系统自带的 crond（BusyBox）
+
+```sh
+sudo rc-update add crond default
+sudo rc-service crond start
+```
+
+### 3. 克隆并配置
+
+```sh
 cd ~
-git clone https://github.com/yongxin-ms/CloudGuardian.git
+git clone https://github.com/xiechangan123/CloudGuardian.git
 cd CloudGuardian
 cp .env.example .env
-
-#为 .env文件中 TX_BYTES_LIMIT 设定阈值，缺省为6G每天，一般不用修改
-
-sudo vim /etc/crontab
-
-# Append the following line to crontab
-* * * * * root cd /home/{YOUR_USER_NAME}/CloudGuardian/ && ./run.sh
 ```
 
-已支持关闭和启动的服务包括：
+编辑 `.env` 文件，重点修改：
+
+- `NIC`：网卡名称（通常是 `eth0` 或 `ens4`）
+- `TX_BYTES_LIMIT`：每日流量上限（单位：字节，默认约 6G）
+
+### 4. 添加定时任务（每分钟执行一次）
+
+Alpine 使用 BusyBox crond，推荐直接编辑 `/etc/crontabs/root`：
+
+```sh
+echo "* * * * * cd /root/CloudGuardian && ./run.sh" >> /etc/crontabs/root
+```
+
+或根据实际路径修改后执行：
+
+```sh
+crontab -e
+```
+
+添加一行：
+
+```
+* * * * * cd /你的路径/CloudGuardian && ./run.sh
+```
+
+### 5. 确保服务已安装
+
+脚本通过 OpenRC 管理以下服务（对应 `/etc/init.d/` 下的名字）：
 
 - nginx
 - v2ray
 - x-ui
 - sing-box
+
+请提前安装好对应服务，并确保存在 `/etc/init.d/对应服务名`。
+
+---
+
+**注意事项：**
+
+1. 脚本必须以 **root** 身份运行。
+2. 在容器中运行时，可能无法直接读取宿主机的 `/sys/class/net`，需要挂载相应路径或使用模拟数据。
+3. 本仓库为 Alpine-only 优化版本，已不再依赖 `systemctl`。
 
 ---
 
@@ -94,39 +141,6 @@ sudo vim /etc/crontab
 
 ---
 
-**如果你觉得这个工具有用��麻烦请 Star，如果您有意见或者建议，欢迎提 Issue！**
+**如果你觉得这个工具有用，麻烦请 Star，如果您有意见或者建议，欢迎提 Issue！**
 
 您的支持是我坚持的动力，感谢！
-
----
-
-## 在 Alpine 上安装与运行（示例）
-
-下面命令在 Alpine Linux 上安装必需的工具并启用 cron 服务（示例）：
-
-安装依赖：
-
-# 安装 jq, util-linux(包含 flock/mktemp), coreutils(提供 GNU date，如果你需要 GNU date 的扩展)
-sudo apk update
-sudo apk add jq util-linux coreutils
-
-# 安装 cron（cronie）以便使用 crontab
-sudo apk add cronie
-sudo rc-update add cronie default
-sudo rc-service cronie start
-
-确保你已经安装并启用了要管理的服务（示例：nginx、v2ray、x-ui、sing-box）且对应的 /etc/init.d/ 存在（Alpine 包通常会在安装后创建 init 脚本或者提供 openrc 脚本）。
-
-克隆并配置：
-
-cd ~
-git clone https://github.com/xiechangan123/CloudGuardian.git
-cd CloudGuardian
-cp .env.example .env
-# 编辑 .env 中 NIC 与 TX_BYTES_LIMIT
-
-# 把脚本加入 crontab（每分钟运行一次）
-# 用 root 编辑 /etc/crontab 或使用 crontab -e
-* * * * * root cd /home/{YOUR_USER_NAME}/CloudGuardian/ && ./run.sh
-
-注意：在容器中直接运行可能无法读取宿主机的 /sys/class/net 接口，若要在容器测试，请将宿主的 /sys/class/net 挂载到容器相应路径或在容器中使用模拟数据用于演示。
