@@ -97,12 +97,6 @@ cd CloudGuardian && cat data.json
 - `current`：网卡累计已发送字节
 - `addup`：今日累计出站流量（字节），超过 `TX_BYTES_LIMIT` 会停止服务
 
-换算成 MB：
-
-```sh
-jq -r '"今日已用: \(.addup/1024/1024|floor) MB\n网卡累计: \(.current/1024/1024|floor) MB"' data.json
-```
-
 #### 方式二：安装 vnstat（可选，更直观）
 
 ```sh
