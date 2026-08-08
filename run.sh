@@ -24,6 +24,7 @@ set -a
 . ./.env
 set +a
 
+# Validate required vars
 : "${NIC:?NIC is not set in .env}"
 : "${TX_BYTES_LIMIT:?TX_BYTES_LIMIT is not set in .env}"
 
