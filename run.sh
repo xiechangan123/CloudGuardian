@@ -41,9 +41,6 @@ fi
 
 # 上锁后，确保脚本退出/崩溃时（非 SIGKILL）自动删锁
 trap 'rm -rf "$LOCKDIR"' EXIT
-	log "Another instance is still running, skipping this run."
-	exit 0
-fi
 
 # 读取流量
 if [ ! -r "/sys/class/net/${NIC}/statistics/tx_bytes" ]; then
