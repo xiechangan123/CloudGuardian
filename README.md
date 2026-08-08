@@ -59,18 +59,16 @@
 
 ## 在 Alpine Linux 上安装与运行（本仓库专用）
 
-本仓库已针对 **Alpine Linux + OpenRC** 全面优化，使用 POSIX `sh` 编写。
+本仓库针对 **Alpine Linux 3.24 + BusyBox + OpenRC** 原生重写，逻辑参照 [yongxin-ms/CloudGuardian](https://github.com/yongxin-ms/CloudGuardian)，**仅依赖 Alpine 官方软件包，不使用 Docker / util-linux / coreutils**。
 
 ### 1. 安装依赖
 
 ```sh
 sudo apk update
-sudo apk add jq util-linux coreutils
+sudo apk add jq
 ```
 
-- `jq`：必须
-- `util-linux`：提供 `mktemp` 等工具
-- `coreutils`：提供更好的 `date` 支持（推荐）
+仅需 `jq`。`date`、`mktemp`、`mkdir`、`crond` 等全部使用 Alpine 自带 BusyBox。
 
 ### 2. 启用系统自带的 crond（BusyBox）
 
@@ -88,26 +86,26 @@ cd CloudGuardian
 cp .env.example .env
 ```
 
-编辑 `.env` 文件，重点修改：
+编辑 `.env`：
 
 - `NIC`：网卡名称（通常是 `eth0` 或 `ens4`）
 - `TX_BYTES_LIMIT`：每日流量上限（单位：字节，默认约 6G）
 
 ### 4. 添加定时任务（每分钟执行一次）
 
-Alpine 使用 BusyBox crond，推荐直接编辑 `/etc/crontabs/root`：
+Alpine BusyBox crond 使用 `/etc/crontabs/root`：
 
 ```sh
 echo "* * * * * cd /root/CloudGuardian && ./run.sh" >> /etc/crontabs/root
 ```
 
-或根据实际路径修改后执行：
+或：
 
 ```sh
 crontab -e
 ```
 
-添加一行：
+添加：
 
 ```
 * * * * * cd /你的路径/CloudGuardian && ./run.sh
@@ -115,22 +113,22 @@ crontab -e
 
 ### 5. 确保服务已安装
 
-脚本通过 OpenRC 管理以下服务（对应 `/etc/init.d/` 下的名字）：
+脚本通过 OpenRC 管理以下服务（对应 `/etc/init.d/`）：
 
 - nginx
 - v2ray
 - x-ui
 - sing-box
 
-请提前安装好对应服务，并确保存在 `/etc/init.d/对应服务名`。
+请提前安装好对应服务。
 
 ---
 
 **注意事项：**
 
 1. 脚本必须以 **root** 身份运行。
-2. 在容器中运行时，可能无法直接读取宿主机的 `/sys/class/net`，需要挂载相应路径或使用模拟数据。
-3. 本仓库为 Alpine-only 优化版本，已不再依赖 `systemctl`。
+2. 本仓库为 Alpine-only 原生版本，使用 BusyBox `date` / `mktemp`，用 `mkdir` 实现互斥锁（替代原版 `flock`），用 `rc-service` 替代 `systemctl`。
+3. 在容器中运行时可能无法读取宿主机 `/sys/class/net`，需挂载相应路径。
 
 ---
 
