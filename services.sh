@@ -2,6 +2,11 @@
 # Alpine/OpenRC oriented service control script
 # Usage: ./services.sh start|stop|status
 
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+cd "$SCRIPT_DIR" || { echo "Cannot cd to $SCRIPT_DIR" >&2; exit 1; }
+
 if [ "$(id -u)" -ne 0 ]; then
   echo "This script must be run as root" >&2
   exit 1
@@ -16,16 +21,21 @@ esac
 log() { printf '%s %s\n' "$(date +%Y%m%d-%H:%M:%S)" "$*"; }
 err() { log "$*" >&2; }
 
-# Services to control. Ensure these correspond to /etc/init.d/<name> on Alpine.
+command -v rc-service >/dev/null 2>&1 || {
+  err "rc-service not found (OpenRC required)"
+  exit 1
+}
+
+# 要管理的服务（对应 /etc/init.d/ 下的名字）
 services="v2ray nginx x-ui sing-box"
 
-# helper to check if service script exists
 service_exists() {
-  svc="$1"
-  if [ -x "/etc/init.d/$svc" ]; then
-    return 0
-  fi
-  return 1
+  [ -x "/etc/init.d/$1" ]
+}
+
+is_running() {
+  # OpenRC status 返回 0 表示 running
+  rc-service "$1" status >/dev/null 2>&1
 }
 
 for svc in $services; do
@@ -36,24 +46,31 @@ for svc in $services; do
 
   case "$action" in
     start)
-      # rc-service may print status; attempt start
+      if is_running "$svc"; then
+        log "$svc: already running, skip."
+        continue
+      fi
       log "Starting $svc..."
-      if rc-service "$svc" start 2>/dev/null; then
+      if rc-service "$svc" start >/dev/null 2>&1; then
         log "$svc started."
       else
         err "ERROR: Failed to start $svc."
       fi
       ;;
     stop)
+      if ! is_running "$svc"; then
+        log "$svc: already stopped, skip."
+        continue
+      fi
       log "Stopping $svc..."
-      if rc-service "$svc" stop 2>/dev/null; then
+      if rc-service "$svc" stop >/dev/null 2>&1; then
         log "$svc stopped."
       else
         err "ERROR: Failed to stop $svc."
       fi
       ;;
     status)
-      if rc-service "$svc" status >/dev/null 2>&1; then
+      if is_running "$svc"; then
         log "$svc: running."
       else
         log "$svc: not running."
