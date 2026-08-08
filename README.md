@@ -86,10 +86,25 @@ cd CloudGuardian
 cp .env.example .env
 ```
 
-编辑 `.env`：
+编辑 `.env`（系统自带 `vi`，推荐）：
 
-- `NIC`：网卡名称（通常是 `eth0` 或 `ens4`）
-- `TX_BYTES_LIMIT`：每日流量上限（单位：字节，默认约 6G）
+```sh
+vi .env
+```
+
+常用操作：
+
+| 按键 | 作用 |
+|------|------|
+| `i` | 进入编辑模式 |
+| 改完后按 `Esc` | 退出编辑模式 |
+| `:wq` 回车 | 保存并退出 |
+| `:q!` 回车 | 不保存退出 |
+
+配置项说明：
+
+- `NIC`：网卡名称（谷歌云默认是 `eth0`）
+- `TX_BYTES_LIMIT`：每日流量上限（单位：字节，默认约 6G；不能写 `100M` 这种带单位的，需写成纯数字，例如 100MB = `104857600`）
 
 ### 4. 添加定时任务（每分钟执行一次）
 
@@ -122,9 +137,49 @@ crontab -e
 
 请提前安装好对应服务。
 
+### 6. 查看流量使用情况
+
+#### 方式一：查看脚本统计（data.json）
+
+```sh
+cat data.json
+```
+
+字段说明：
+
+- `current`：网卡累计已发送字节
+- `addup`：今日累计出站流量（字节），超过 `TX_BYTES_LIMIT` 会停止服务
+
+换算成 MB：
+
+```sh
+jq -r '"今日已用: \(.addup/1024/1024|floor) MB\n网卡累计: \(.current/1024/1024|floor) MB"' data.json
+```
+
+#### 方式二：安装 vnstat（可选，更直观）
+
+```sh
+apk add vnstat
+rc-update add vnstatd default
+rc-service vnstatd start
+```
+
+常用命令：
+
+```sh
+vnstat                 # 总览
+vnstat -i eth0         # 指定网卡（谷歌云默认 eth0）
+vnstat -d -i eth0      # 按天
+vnstat -m -i eth0      # 按月
+vnstat -l -i eth0      # 实时
+```
+
+说明：`vnstat` 仅用于查看，不参与脚本限速逻辑；需运行一段时间后才有历史数据。
+
 ---
 
 **注意事项：**
+
 
 1. 脚本必须以 **root** 身份运行。
 2. 本仓库为 Alpine-only 原生版本，使用 BusyBox `date` / `mktemp`，用 `mkdir` 实现互斥锁（替代原版 `flock`），用 `rc-service` 替代 `systemctl`。
