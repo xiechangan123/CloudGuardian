@@ -31,7 +31,7 @@ set +a
 : "${TX_BYTES_LIMIT:?TX_BYTES_LIMIT is not set in .env}"
 
 # ---- 从这里开始上锁，锁住整个"读-算-写"临界区（BusyBox 无 flock，用 mkdir 实现）----
-LOCKDIR="$SCRIPT_DIR/.run.lock"
+LOCKDIR="$SCRIPT_DIR/data.json.lockdir"
 
 # 尝试上锁
 if ! mkdir "$LOCKDIR" 2>/dev/null; then
