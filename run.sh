@@ -18,8 +18,10 @@ fi
 # 仅依赖 jq（Alpine 官方包），其余全部用 BusyBox
 command -v jq >/dev/null 2>&1 || die "jq could not be found. Please install jq (apk add jq)."
 
+# Load environment
 [ -f .env ] || die ".env not found. Please create a .env file."
 set -a
+
 # shellcheck disable=SC1091
 . ./.env
 set +a
@@ -28,50 +30,17 @@ set +a
 : "${NIC:?NIC is not set in .env}"
 : "${TX_BYTES_LIMIT:?TX_BYTES_LIMIT is not set in .env}"
 
-# ---- 简单互斥锁（BusyBox 无 flock，用 mkdir 实现）----
+# ---- 从这里开始上锁，锁住整个"读-算-写"临界区（BusyBox 无 flock，用 mkdir 实现）----
 LOCKDIR="$SCRIPT_DIR/.run.lock"
-MAX_LOCK_AGE=120
 
-acquire_lock() {
-	if mkdir "$LOCKDIR" 2>/dev/null; then
-		echo $$ >"$LOCKDIR/pid"
-		trap 'rm -rf "$LOCKDIR"' EXIT
-		return 0
-	fi
+# 尝试上锁
+if ! mkdir "$LOCKDIR" 2>/dev/null; then
+	log "Another instance is still running, skipping this run."
+	exit 0
+fi
 
-	# 进程已死则清锁
-	if [ -f "$LOCKDIR/pid" ]; then
-		old_pid=$(cat "$LOCKDIR/pid" 2>/dev/null || echo "")
-		if [ -n "$old_pid" ] && ! kill -0 "$old_pid" 2>/dev/null; then
-			log "Stale lock (pid $old_pid dead), removing."
-			rm -rf "$LOCKDIR"
-			if mkdir "$LOCKDIR" 2>/dev/null; then
-				echo $$ >"$LOCKDIR/pid"
-				trap 'rm -rf "$LOCKDIR"' EXIT
-				return 0
-			fi
-		fi
-	fi
-
-	# 锁过期则强制清除（BusyBox date -r 读文件 mtime）
-	if [ -d "$LOCKDIR" ]; then
-		lock_mtime=$(date -r "$LOCKDIR" +%s 2>/dev/null || echo 0)
-		now=$(date +%s)
-		if [ "$lock_mtime" -gt 0 ] && [ $((now - lock_mtime)) -gt "$MAX_LOCK_AGE" ]; then
-			log "Lock older than ${MAX_LOCK_AGE}s, force removing."
-			rm -rf "$LOCKDIR"
-			if mkdir "$LOCKDIR" 2>/dev/null; then
-				echo $$ >"$LOCKDIR/pid"
-				trap 'rm -rf "$LOCKDIR"' EXIT
-				return 0
-			fi
-		fi
-	fi
-
-	return 1
-}
-
-if ! acquire_lock; then
+# 上锁后，确保脚本退出/崩溃时（非 SIGKILL）自动删锁
+trap 'rm -rf "$LOCKDIR"' EXIT
 	log "Another instance is still running, skipping this run."
 	exit 0
 fi
@@ -94,6 +63,7 @@ LAST_UPDATE=$(jq -r '.last_update' data.json)
 CURRENT=$(jq -r '.current' data.json)
 ADD_UP=$(jq -r '.addup' data.json)
 
+# Load state
 LAST_UPDATE=${LAST_UPDATE:-0}
 CURRENT=${CURRENT:-0}
 ADD_UP=${ADD_UP:-0}
@@ -126,7 +96,7 @@ if [ "$ADD_UP" -gt "$TX_BYTES_LIMIT" ]; then
 	./services.sh stop
 fi
 
-# 原子写回（BusyBox mktemp 支持 path/TEMPLATE.XXXXXX）
+# Persist state（BusyBox mktemp 支持 path/TEMPLATE.XXXXXX）
 tmp=$(mktemp "$SCRIPT_DIR/data.json.XXXXXX")
 jq --argjson last_update "$LAST_UPDATE" \
 	--argjson current "$CURRENT" \
@@ -134,5 +104,5 @@ jq --argjson last_update "$LAST_UPDATE" \
 	'.last_update = $last_update | .current = $current | .addup = $addup' \
 	data.json >"$tmp" && mv "$tmp" data.json
 
-# 锁由 trap 在 EXIT 时清理
+# 脚本退出时 trap 自动删除锁目录
 
