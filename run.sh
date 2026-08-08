@@ -31,7 +31,7 @@ set +a
 : "${TX_BYTES_LIMIT:?TX_BYTES_LIMIT is not set in .env}"
 
 # ---- 从这里开始上锁，锁住整个"读-算-写"临界区（BusyBox 无 flock，用 mkdir 实现）----
-LOCKDIR="$SCRIPT_DIR/data.json.lockdir"
+LOCKDIR="$SCRIPT_DIR/.run.lock"
 
 # 尝试上锁
 if ! mkdir "$LOCKDIR" 2>/dev/null; then
@@ -41,6 +41,9 @@ fi
 
 # 上锁后，确保脚本退出/崩溃时（非 SIGKILL）自动删锁
 trap 'rm -rf "$LOCKDIR"' EXIT
+	log "Another instance is still running, skipping this run."
+	exit 0
+fi
 
 # 读取流量
 if [ ! -r "/sys/class/net/${NIC}/statistics/tx_bytes" ]; then
@@ -52,7 +55,7 @@ NET_OUT=${NET_OUT:-0}
 # 初始化 data.json
 if [ ! -f data.json ]; then
 	log "data.json not found. Creating a new one."
-	jq -n --arg now "$(date +%Y-%m-%d\ %H:%M:%S)" --argjson current "$NET_OUT" \
+	jq -n --argjson now "$(date +%s)" --argjson current "$NET_OUT" \
 		'{last_update: $now, current: $current, addup: 0}' >data.json
 fi
 
@@ -61,12 +64,13 @@ CURRENT=$(jq -r '.current' data.json)
 ADD_UP=$(jq -r '.addup' data.json)
 
 # Load state
+LAST_UPDATE=${LAST_UPDATE:-0}
 CURRENT=${CURRENT:-0}
 ADD_UP=${ADD_UP:-0}
-TIME_NOW=$(date +%Y-%m-%d\ %H:%M:%S)
+TIME_NOW=$(date +%s)
 
-# 判断是否跨天（BusyBox 支持 date -d @timestamp）（从 last_update 字符串中提取日期）
-last_ymd=$(echo "$LAST_UPDATE" | cut -d' ' -f1 | tr -d '-')
+# 判断是否跨天（BusyBox 支持 date -d @timestamp）
+last_ymd=$(date -d "@$LAST_UPDATE" +%Y%m%d 2>/dev/null || echo "00000000")
 today_ymd=$(date +%Y%m%d)
 
 if [ "$last_ymd" != "$today_ymd" ]; then
@@ -94,7 +98,7 @@ fi
 
 # Persist state（BusyBox mktemp 支持 path/TEMPLATE.XXXXXX）
 tmp=$(mktemp "$SCRIPT_DIR/data.json.XXXXXX")
-jq --arg last_update "$LAST_UPDATE" \
+jq --argjson last_update "$LAST_UPDATE" \
 	--argjson current "$CURRENT" \
 	--argjson addup "$ADD_UP" \
 	'.last_update = $last_update | .current = $current | .addup = $addup' \
